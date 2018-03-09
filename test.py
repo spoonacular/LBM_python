@@ -1,4 +1,2 @@
-
-y = 1/2
-print(y)
-print('nice\n')
+if __name__ == "__main__":
+	print('nice')
