@@ -23,4 +23,23 @@ superG.print()
 sLattice = SuperLattice2D(superG)
 print(superG.materialMap)
 
+print('=================')
+class test_A():
+	tt = 111
+	def __init__(self):
+		self.x =1
+		print('nice')
+	def bark(self):
+		print('bark')
 
+
+class parent_A(test_A):
+	def __init__(self):
+		self.y = 10
+		print('end')
+
+
+
+pig = parent_A()
+pig.bark()
+print(pig.tt)
