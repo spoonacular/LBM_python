@@ -1,7 +1,6 @@
 import numpy
 import matplotlib 
 # test : parabolic profile in Poiseuille flow using lBM
-
 # Parameters for the simulation setup, all in lattice units
 nx = 200
 ny = 50
@@ -24,12 +23,12 @@ def prepareGeometry(superGeometry):
 	rightOutlet = Indicator.cuboid([200,1],[200,199])
 	middleCircle = Indicator.circle([25,25],10)
 
-	bouncebacks = topPlate + botPlate + middleCircle
-
 	superGeometry.rename(0,1)
 	superGeometry.rename(1,3,leftInlet)
 	superGeometry.rename(1,4,rightOutlet)
-	superGeometry.rename(1,5,bouncebacks)
+	superGeometry.rename(1,5,topPlate)
+	superGeometry.rename(1,5,botPlate)
+	superGeometry.rename(1,5,middleCircle)
 
 	superGeometry.clean() #assume material 0 is getNoDynamics
 	superGeometry.print()
