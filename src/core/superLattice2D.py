@@ -9,15 +9,14 @@ from src.geometry.Geometry2D import *
 class SuperLattice2D(SuperGeometry):
 	def __init__(self,SuperGeometry):
 		self.DnQn = 'D2Q9'
-		self.distribution = numpy.array([4/9, 1/9,1/9,1/9,1/9, 1/36,1/36,1/36,1/36]) #counterclockwise
-		self.cx = 			numpy.array([  0,   1,  0, -1,  0,    1,  -1,  -1,   1])
-		self.cy = 			numpy.array([  0,   0,  1,  0, -1,    1,   1,  -1,  -1])
 		self.opposite = 	numpy.array([  1,   4,  5,  2,  3,    8,   9,   6,   7]) #should be moved to boundary condition part
-
 		self.df = numpy.zeros([SuperGeometry.materialMap.shape[0],SuperGeometry.materialMap.shape[1],9])
 
-	def defineDynamics(self,materialNum,dynamics):
-		pass
+	def defineDynamics(self, SuperGeometry, materialNum, dynamics):
+		self.omega = numpy.zeros([SuperGeometry.materialMap.shape[0],SuperGeometry.materialMap.shape[1]])
+		for coord in self.getMaterialCoords(materialNum,SuperGeometry):
+			self.omega[coord[0],coord[1]] = dynamics.omega
+
 
 	def defineRhoU(self,SuperGeometry,materialNum,rho,u):
 		self.rhoMap = numpy.zeros([SuperGeometry.materialMap.shape[0],SuperGeometry.materialMap.shape[1]])
@@ -33,6 +32,7 @@ class SuperLattice2D(SuperGeometry):
 		pass
 
 	def collide(self):
+
 		pass
 
 	def stream(self):
@@ -99,5 +99,7 @@ if __name__ == "__main__":
 	#print(sLattice.getUxMap())
 	#print(sLattice.getUyMap())
 	#print(sLattice.getSpeedMap())
+
+	print(superG.periodicity)
 
 	

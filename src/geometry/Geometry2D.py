@@ -20,12 +20,12 @@ class Indicator():
 
 class CuboidGeometry2D():
 	dimension = 2
+	periodicity = [False, False]
 	def __init__(self,x1,x2,y1,y2):
 		self.boundary = [x1, x2, y1+1, y2+1]
-		self.periodicity = [False, False]
 
 	def setPeriodicity(self,tf_x = False, tf_y = False):
-		self.periodicity = [tf_x, tf_y]
+		periodicity = [tf_x, tf_y]
 
 class SuperGeometry(CuboidGeometry2D):
 	def __init__(self,CuboidGeometry2D):
@@ -77,8 +77,6 @@ if __name__ == "__main__":
 	superG.rename(0,1,circle)
 	print(superG.materialMap)
 	superG.print()
-
-
 
 
 
