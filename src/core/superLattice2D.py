@@ -4,7 +4,7 @@ if __name__ == "__main__":
 	sys.path[0] = '/'.join(sys.path[0].split('/')[0:-2]) #go up 2 level
 from src.geometry.Geometry2D import *
 from src.dynamics.dynamics2D import *
-
+from src.boundary.boundaryCondition2D import *
 
 class SuperLattice2D(SuperGeometry):
 	def __init__(self,SuperGeometry):
@@ -45,6 +45,17 @@ class SuperLattice2D(SuperGeometry):
 			self.UMap[coord[0],coord[1],0] = u[0]
 			self.UMap[coord[0],coord[1],1] = u[1]
 
+	def defineU(self,SuperGeometry,materialNum,u):
+		self.vloc = 0
+		for coord in self.getMaterialCoords(materialNum,SuperGeometry):
+			if u.size == 2:
+				self.UMap[coord[0],coord[1],0] = u[0]
+				self.UMap[coord[0],coord[1],1] = u[1]
+			else:
+				self.UMap[coord[0],coord[1],0] = u[self.vloc,0]
+				self.UMap[coord[0],coord[1],1] = u[self.vloc,1]
+				self.vloc = self.vloc + 1
+
 
 	def collideAndStream(self):
 		pass
@@ -56,9 +67,8 @@ class SuperLattice2D(SuperGeometry):
 			self.surrundingDynamics = numpy.zeros(self.f.shape)
 			for i in numpy.arange(9):
 				self.surrundingDynamics[:,:,i] = numpy.roll(numpy.roll(self.dynamics,-self.cx[i],0),-self.cy[i],1)
-
-
 			self.initDF = 1
+
 		#collision
 		for i in numpy.arange(self.rhoMap.shape[0]):
 			for j in numpy.arange(self.rhoMap.shape[1]):
@@ -69,7 +79,7 @@ class SuperLattice2D(SuperGeometry):
 				elif self.dynamics[i,j] == 2: #bounce back (half-way bounce back. ref: LBM:the principles and methods p177)
 					pass
 
-	def BGKcollide(self,i,j,f,ux,uy):
+	def BGKcollide(self,i,j,f,ux,uy): #consuming most of the time
 		self.t1 = numpy.power(ux,2)+numpy.power(uy,2) # u^2
 		self.t2 = numpy.zeros([ux.shape[0],ux.shape[1],9])
 		for i in numpy.arange(ux.shape[0]):
@@ -82,12 +92,33 @@ class SuperLattice2D(SuperGeometry):
 
 
 	def stream(self):
+		#pre-stream velocity boundary setup
+
+		#pre-stream pressure boundary setup
+
+
+
+		#bounceback
+		# for i in numpy.arange(self.dynamics.shape[0]):
+		# 	for j in numpy.arange(self.dynamics.shape[1]):
+
+		# 		if self.dynamics[i,j] == 1:	
+		# 			for k in numpy.arange(1,9):
+		# 				if self.surrundingDynamics[i,j,k] == 2: #half way bounceback: modify f on wall
+		# 					self.f[(i+self.cx[k])%self.f.shape[0],(j+self.cy[k])%self.f.shape[1],self.opposite[k]] = self.f[i,j,k]
+
+
+
+		#bounceback 2
 		for i in numpy.arange(self.dynamics.shape[0]):
 			for j in numpy.arange(self.dynamics.shape[1]):
-				if self.dynamics[i,j] == 1:	
+				if self.dynamics[i,j] == 2:	
 					for k in numpy.arange(1,9):
-						if self.surrundingDynamics[i,j,k] == 2: #half way bounceback: modify f on wall
-							self.f[(i+self.cx[k])%self.f.shape[0],(j+self.cy[k])%self.f.shape[1],self.opposite[k]] = self.f[i,j,k]
+						if self.surrundingDynamics[i,j,k] == 1: #half way bounceback: modify f on near bulk fluids
+							self.f[i,j,k] = self.f[(i+self.cx[k])%self.f.shape[0],(j+self.cy[k])%self.f.shape[1],self.opposite[k]] 
+
+		#stream
+
 
 		for k in numpy.arange(1,9):
 			self.f[:,:,k] = numpy.roll(numpy.roll(self.f[:,:,k],self.cx[k],0),self.cy[k],1)
@@ -131,15 +162,6 @@ class SuperLattice2D(SuperGeometry):
 
 
 
-	@staticmethod #return N x 2 matrix 
-	def getMaterialCoords(materialNum,SuperGeometry):
-		materialCoords = numpy.zeros([0,2])
-		for x in numpy.arange(SuperGeometry.materialMap.shape[0]):
-			for y in numpy.arange(SuperGeometry.materialMap.shape[1]):
-				if SuperGeometry.materialMap[x][y] == materialNum:
-					materialCoords = numpy.append(materialCoords,[[x,y]],0)
-		return numpy.int_(materialCoords)
-
 
 
 if __name__ == "__main__":
@@ -154,6 +176,7 @@ if __name__ == "__main__":
 	#define geometry
 	topPlate = Indicator.cuboid(0,ny,nx,ny) #x1,y1,x2,y2
 	circle = Indicator.circle(center_x,center_y,radius)
+	rightPlate = Indicator.cuboid(nx,0,nx,ny)
 
 	cGeometry = CuboidGeometry2D(0,0,nx,ny)
 	cGeometry.setPeriodicity()
@@ -161,21 +184,21 @@ if __name__ == "__main__":
 	superG.rename(0,5,topPlate)
 	superG.rename(0,1,circle)
 	superG.rename(0,2)
+	superG.rename(2,3,rightPlate)
 	#print(superG.materialMap)
 	superG.print()
 	print('================================================')
 	#lattice
 	rho = 1
-	u = [0.1,0.]
+	u = [0,0.]
 	sLattice = SuperLattice2D(superG)
-	sLattice.defineRhoU(superG,1,1.1,u)
+	sLattice.defineRhoU(superG,1,1.0,u)
 	#print(sLattice.getRhoMap())
 	sLattice.defineRhoU(superG,5,1.0,u)
-
+	sLattice.defineRhoU(superG,3,1,u)
 	sLattice.defineRhoU(superG,2,rho,u)
-	print(sLattice.getRhoMap())
+	#print(sLattice.getRhoMap())
 	#print(sLattice.getRhoMap().sum())
-
 	#print(sLattice.getUxMap())
 	#print(sLattice.getUyMap())
 	#print(sLattice.getSpeedMap())
@@ -189,12 +212,18 @@ if __name__ == "__main__":
 	#print(sLattice.dynamics)
 	#print(sLattice.getUxMap())
 	#print(sLattice.getUyMap())
-	print(sLattice.rhoMap.sum(0).sum(0))
-	print(sLattice.rhoMap.sum(0)[-1]  )
-	print(sLattice.getAverageRho())
-	for i in numpy.arange(1):
+	#print(sLattice.getAverageRho())
+	#print(sLattice.getRhoMap())
+	maxVelocity = numpy.array([-0.1,0])
+	poV = Poiseuille2D(superG,3,maxVelocity,0.5) #SuperGeometry,materialNum,maxVelocity,distance2Wall
+
+	for i in numpy.arange(100):
 		sLattice.collide()
 		sLattice.stream()
+		sLattice.defineU(superG,3,poV.getVelocityField())
+		#print(sLattice.getUxMap())
+		#print(sLattice.getAverageRho())
+	#print(poV.getVelocityField())
 
 
 
@@ -206,7 +235,7 @@ if __name__ == "__main__":
 	#print(sLattice.rhoMap)
 	#print(sLattice.getUxMap())
 	#print(sLattice.getUyMap())
-	print(sLattice.getRhoMap())
+	#print(sLattice.getRhoMap())
 	#print(sLattice.getRhoMap().sum())
 
 	print(sLattice.getAverageRho())

@@ -7,6 +7,8 @@ z = numpy.array([[[1,2,3],[4,5,6],[7,8,9]],[[1,2,3],[4,5,6],[7,8,9]]])
 
 #print(x+y)
 print(13%10)
+
+print(x.size)
 #after roll
 
 # def getMaterialCoords():

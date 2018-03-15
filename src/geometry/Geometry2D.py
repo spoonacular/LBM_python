@@ -51,6 +51,15 @@ class SuperGeometry(CuboidGeometry2D):
 		else:
 			print('rename: unidentified number of input')
 
+	@staticmethod #return N x 2 matrix 
+	def getMaterialCoords(materialNum,SuperGeometry):
+		materialCoords = numpy.zeros([0,2])
+		for x in numpy.arange(SuperGeometry.materialMap.shape[0]):
+			for y in numpy.arange(SuperGeometry.materialMap.shape[1]):
+				if SuperGeometry.materialMap[x][y] == materialNum:
+					materialCoords = numpy.append(materialCoords,[[x,y]],0)
+		return numpy.int_(materialCoords)
+		
 	def print(self):
 		non_duplicate = list(map(numpy.unique, self.materialMap.reshape(1,self.materialMap.size)))
 
