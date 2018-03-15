@@ -1,10 +1,13 @@
 import numpy
 
+x = numpy.array([[1,2,3],[4,5,6],[7,8,9]])
+y = numpy.array([[1,2,3],[4,5,6],[7,8,9]])
 
+z = numpy.array([[[1,2,3],[4,5,6],[7,8,9]],[[1,2,3],[4,5,6],[7,8,9]]])
 
-
-
-
+#print(x+y)
+print(13%10)
+#after roll
 
 # def getMaterialCoords():
 # 	materialCoords = numpy.zeros([0,2])
