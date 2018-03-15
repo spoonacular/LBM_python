@@ -35,21 +35,21 @@ class SuperGeometry(CuboidGeometry2D):
 	def rename(self,fromM,toM,*args):
 		if len(args) == 0:
 			numpy.place(self.materialMap,self.materialMap==fromM,toM)
-		if len(args) == 1:
+		elif len(args) == 1:
 			if args[0]._shape == 'cuboid':
 				toBeReplaced = self.materialMap[args[0].vertices[0]:args[0].vertices[2]+1,args[0].vertices[1]:args[0].vertices[3]+1]
 				numpy.place(toBeReplaced,toBeReplaced==fromM,toM)
 			elif args[0]._shape == 'circle':
 				center_x0 = args[0].center[0]
 				center_y0 = args[0].center[1]
-				for coord_x in range(self.materialMap.shape[0]):
-					for coord_y in range(self.materialMap.shape[1]):
+				for coord_x in numpy.arange(self.materialMap.shape[0]):
+					for coord_y in numpy.arange(self.materialMap.shape[1]):
 						distance = numpy.sqrt(numpy.power((numpy.float64(coord_x)-center_x0),2)+numpy.power((numpy.float64(coord_y)-center_y0),2))
 						if self.materialMap[coord_x][coord_y] == fromM:
 							if distance <= args[0].radius:
 								self.materialMap[coord_x][coord_y] = toM
 		else:
-			print('features currently not available')
+			print('rename: unidentified number of input')
 
 	def print(self):
 		non_duplicate = list(map(numpy.unique, self.materialMap.reshape(1,self.materialMap.size)))
