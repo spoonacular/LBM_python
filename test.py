@@ -23,8 +23,8 @@ class Foo(object):
 
 
 numpy.set_printoptions(3)
-nx = 10
-ny = 5
+nx = 200
+ny = 100
 center_x = 3
 center_y = 3
 radius = 2
@@ -46,12 +46,12 @@ superG.print()
 print('================================================')
 #lattice
 rho = 1
-u = [0,0.]
+u = [0,0]
 sLattice = SuperLattice2D(superG)
-sLattice.defineRhoU(superG,1,1.0,u)
+sLattice.defineRhoU(superG,1,rho,u)
 #print(sLattice.getRhoMap())
-sLattice.defineRhoU(superG,5,1.0,u)
-sLattice.defineRhoU(superG,3,1,u)
+sLattice.defineRhoU(superG,5,rho,u)
+sLattice.defineRhoU(superG,3,rho,u)
 sLattice.defineRhoU(superG,2,rho,u)
 #print(sLattice.getRhoMap())
 #print(sLattice.getRhoMap().sum())
@@ -62,6 +62,7 @@ bulk1 = BGKdynamics(omega)
 bounceb = bounceBack()
 sLattice.defineDynamics(superG,1,bulk1)# SuperGeometry, materialNum, dynamics
 sLattice.defineDynamics(superG,2,bulk1)
+sLattice.defineDynamics(superG,3,bulk1)
 sLattice.defineDynamics(superG,5,bounceb)
 #print(sLattice.dynamics)
 #print(sLattice.omega)
@@ -93,7 +94,7 @@ def define(iter):
 	sLattice.defineU(superG,3,poV.getVelocityField())
 
 f1()
-collide(10)
+collide(1000)
 stream(10000)
 define(10000)
 Foo().foo()

@@ -18,6 +18,10 @@ class SuperLattice2D(SuperGeometry):
 		self.initDF = 0
 		self.rhoMap = numpy.zeros([SuperGeometry.materialMap.shape[0],SuperGeometry.materialMap.shape[1]])
 		self.UMap = numpy.zeros([SuperGeometry.materialMap.shape[0],SuperGeometry.materialMap.shape[1],2])
+
+
+
+
 	def defineDynamics(self, SuperGeometry, materialNum, dynamics):
 		for coord in self.getMaterialCoords(materialNum,SuperGeometry):
 			self.dynamics[coord[0],coord[1]] = dynamics.index
@@ -47,6 +51,7 @@ class SuperLattice2D(SuperGeometry):
 
 	def defineU(self,SuperGeometry,materialNum,u):
 		self.vloc = 0
+		#only support symmetrical velocity profile
 		for coord in self.getMaterialCoords(materialNum,SuperGeometry):
 			if u.size == 2:
 				self.UMap[coord[0],coord[1],0] = u[0]
@@ -69,34 +74,52 @@ class SuperLattice2D(SuperGeometry):
 				self.surrundingDynamics[:,:,i] = numpy.roll(numpy.roll(self.dynamics,-self.cx[i],0),-self.cy[i],1)
 			self.initDF = 1
 
-		#collision
-		for i in numpy.arange(self.rhoMap.shape[0]):
-			for j in numpy.arange(self.rhoMap.shape[1]):
-				if self.dynamics[i,j] == 0: #no dynamics
-					pass
-				elif self.dynamics[i,j] == 1: #BGK dynamics
-					self.BGKcollide(i,j,self.f,self.UMap[:,:,0],self.UMap[:,:,1]) #i,j,f,ux,uy
-				elif self.dynamics[i,j] == 2: #bounce back (half-way bounce back. ref: LBM:the principles and methods p177)
-					pass
 
-	def BGKcollide(self,i,j,f,ux,uy): #consuming most of the time
-		self.t1 = numpy.power(ux,2)+numpy.power(uy,2) # u^2
-		self.t2 = numpy.zeros([ux.shape[0],ux.shape[1],9])
-		for i in numpy.arange(ux.shape[0]):
-			for j in numpy.arange(ux.shape[1]):
-				for k in numpy.arange(9):
-					self.t2[i,j,k] = ux[i,j]*self.cx[k]+uy[i,j]*self.cy[k] #c_xy * u
-					self.feq[i,j,k] = self.rhoMap[i,j]*self.distribution[k]*(1+3*self.t2[i,j,k]+4.5*self.t2[i,j,k]**2-1.5*self.t1[i,j])
-					self.f[i,j,k] = self.omega[i,j]*self.feq[i,j,k] + (1-self.omega[i,j])*f[i,j,k]
+			#reset rho for walls
+			if 2 in self.dynamics:
+				self.tmp_wall_rho = numpy.zeros(self.rhoMap.shape)
+				#self.tmp_wall_u = numpy.zeros(self.UMap.shape)
+				for i in numpy.arange(self.rhoMap.shape[0]):
+					for j in numpy.arange(self.rhoMap.shape[1]):
+						if self.dynamics[i,j] == 2:
+							#self.tmp_wall_u[i,j,:] = self.UMap[i,j,:]
+							self.tmp_wall_rho[i,j] = self.rhoMap[i,j]
 
+		# #collision
+		# for i in numpy.arange(self.rhoMap.shape[0]):
+		# 	for j in numpy.arange(self.rhoMap.shape[1]):
+		# 		if self.dynamics[i,j] == 0: #no dynamics
+		# 			pass
+		# 		elif self.dynamics[i,j] == 1: #BGK dynamics
+		# 			self.BGKcollide(i,j,self.f,self.UMap[i,j,0],self.UMap[i,j,1])
+
+		# 		elif self.dynamics[i,j] == 2: #bounce back (half-way bounce back. ref: LBM:the principles and methods p177)
+		# 			pass
+
+		#collision N2
+		self.BGKcollide()
+
+	# def BGKcollide(self,i,j,f,ux,uy): #consuming most of the time
+	# 	self.t1 = ux*ux+uy*uy
+	# 	self.t2 = numpy.zeros(9)
+	# 	for k in numpy.arange(9):
+	# 		self.t2[k] = ux*self.cx[k]+uy*self.cy[k] #c_xy * u
+	# 		self.feq[i,j,k] = self.rhoMap[i,j]*self.distribution[k]*(1+3*self.t2[k]+4.5*self.t2[k]**2-1.5*self.t1)
+	# 	self.f[i,j,k] = self.omega[i,j]*self.feq[i,j,k] + (1-self.omega[i,j])*f[i,j,k]
+
+	def BGKcollide(self):
+		self.t1 = self.UMap[:,:,0]*self.UMap[:,:,0] + self.UMap[:,:,1]*self.UMap[:,:,1]
+		self.t2 = numpy.zeros(self.f.shape)
+		for k in numpy.arange(9):
+			self.t2[:,:,k] = self.UMap[:,:,0]*self.cx[k]+self.UMap[:,:,1]*self.cy[k]
+			self.feq[:,:,k] = self.rhoMap*self.distribution[k]*(1+3*self.t2[:,:,k]+4.5*self.t2[:,:,k]*self.t2[:,:,k]-1.5*self.t1)
+			self.f[:,:,k] = self.omega*self.feq[:,:,k] +(1-self.omega)*self.f[:,:,k]
 
 
 	def stream(self):
 		#pre-stream velocity boundary setup
 
 		#pre-stream pressure boundary setup
-
-
 
 		#bounceback
 		# for i in numpy.arange(self.dynamics.shape[0]):
@@ -106,8 +129,6 @@ class SuperLattice2D(SuperGeometry):
 		# 			for k in numpy.arange(1,9):
 		# 				if self.surrundingDynamics[i,j,k] == 2: #half way bounceback: modify f on wall
 		# 					self.f[(i+self.cx[k])%self.f.shape[0],(j+self.cy[k])%self.f.shape[1],self.opposite[k]] = self.f[i,j,k]
-
-
 
 		#bounceback 2
 		for i in numpy.arange(self.dynamics.shape[0]):
@@ -119,10 +140,19 @@ class SuperLattice2D(SuperGeometry):
 
 		#stream
 
-
 		for k in numpy.arange(1,9):
 			self.f[:,:,k] = numpy.roll(numpy.roll(self.f[:,:,k],self.cx[k],0),self.cy[k],1)
 		self.getRhoUMap() #calculate rhoMap given f after stream
+
+		#reset wall density and velocity
+		if hasattr(self,'tmp_wall_rho'):
+			for i in numpy.arange(self.dynamics.shape[0]):
+				for j in numpy.arange(self.dynamics.shape[1]):
+					if self.dynamics[i,j] == 2:
+						self.UMap[i,j,:] = numpy.array([0,0])
+						self.rhoMap[i,j] = self.tmp_wall_rho[i,j]
+					#self.rhoMap[i,j] = self. ##################################################
+
 
 	def getRhoUMap(self):
 		self.rhoMap = self.f.sum(2)
@@ -204,28 +234,33 @@ if __name__ == "__main__":
 	#print(sLattice.getSpeedMap())
 	bulk1 = BGKdynamics(omega)
 	bounceb = bounceBack()
+
 	sLattice.defineDynamics(superG,1,bulk1)# SuperGeometry, materialNum, dynamics
 	sLattice.defineDynamics(superG,2,bulk1)
+	sLattice.defineDynamics(superG,3,bulk1)
 	sLattice.defineDynamics(superG,5,bounceb)
 	#print(sLattice.dynamics)
 	#print(sLattice.omega)
 	#print(sLattice.dynamics)
-	#print(sLattice.getUxMap())
+
 	#print(sLattice.getUyMap())
-	#print(sLattice.getAverageRho())
-	#print(sLattice.getRhoMap())
+	print(sLattice.getAverageRho())
+	print(sLattice.getRhoMap())
 	maxVelocity = numpy.array([-0.1,0])
 	poV = Poiseuille2D(superG,3,maxVelocity,0.5) #SuperGeometry,materialNum,maxVelocity,distance2Wall
 
+	sLattice.defineU(superG,3,poV.getVelocityField())
+
+	print(sLattice.getUxMap())
+
 	for i in numpy.arange(100):
+		sLattice.defineU(superG,3,poV.getVelocityField())
 		sLattice.collide()
 		sLattice.stream()
-		sLattice.defineU(superG,3,poV.getVelocityField())
+
 		#print(sLattice.getUxMap())
 		#print(sLattice.getAverageRho())
 	#print(poV.getVelocityField())
-
-
 
 	#print(sLattice.dynamics)
 
@@ -233,11 +268,10 @@ if __name__ == "__main__":
 
 	#print(sLattice.f[:,:,1])
 	#print(sLattice.rhoMap)
-	#print(sLattice.getUxMap())
+	print(sLattice.getUxMap())
 	#print(sLattice.getUyMap())
-	#print(sLattice.getRhoMap())
+	print(sLattice.getRhoMap())
 	#print(sLattice.getRhoMap().sum())
-
 	print(sLattice.getAverageRho())
 
 
