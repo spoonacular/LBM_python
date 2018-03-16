@@ -1,5 +1,14 @@
 import numpy
 
+dynamicsIndex = {
+	0:'noDynamics',
+	1:'BGKdynamics',
+	2:'bounceBack (half-way)',
+	3:'velocityBoundary',
+	4:'pressureBoundary',
+	5:'movingWall'
+}
+
 class noDynamics():
 	def __init__(self):
 		self.index = 0
@@ -12,6 +21,18 @@ class BGKdynamics():
 class bounceBack():
 	def __init__(self):
 		self.index = 2
+
+class velocityBoundary():
+	def __init__(self):
+		self.index = 3
+
+class pressureBoundary():
+	def __init__(self):
+		self.index = 4
+
+class movingWall():
+	def __init__(self):
+		self.index = 5
 
 	# def calEqulibriumFunction(self,df):
 

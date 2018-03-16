@@ -1,12 +1,46 @@
 import numpy
+import time
 
-x = numpy.array([[1,2,3],[4,5,6],[7,8,9]])
-y = numpy.array([[1,2,3],[4,5,6],[7,8,9]])
+def timeit(method):
 
-z = numpy.array([[[1,2,3],[4,5,6],[7,8,9]],[[1,2,3],[4,5,6],[7,8,9]]])
+    def timed(*args, **kw):
+        ts = time.time()
+        result = method(*args, **kw)
+        te = time.time()
 
-#print(x+y)
-print(13%10)
+        print ('%r (%r, %r) %2.2f sec' % (method.__name__, args, kw, te-ts))
+              
+        return result
+
+    return timed
+
+
+class Foo(object):
+
+    @timeit
+    def foo(self, a=2, b=3):
+        pass
+
+
+@timeit
+def method1():
+	x = numpy.arange(1000000)
+	x = x*x
+
+@timeit
+def method2():
+	y = numpy.arange(1000000)
+	for i in numpy.arange(1000000):
+		y[i] = i*i
+
+
+
+method1()
+method2()
+Foo().foo()
+
+
+
 #after roll
 
 # def getMaterialCoords():
