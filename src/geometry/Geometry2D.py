@@ -31,6 +31,7 @@ class SuperGeometry(CuboidGeometry2D):
 	def __init__(self,CuboidGeometry2D):
 		self.boundary = CuboidGeometry2D.boundary
 		self.materialMap = numpy.zeros([self.boundary[2]-self.boundary[0],self.boundary[3]-self.boundary[1]])
+		self.materialCoordsDic = {}
 
 	def rename(self,fromM,toM,*args):
 		if len(args) == 0:
@@ -51,15 +52,22 @@ class SuperGeometry(CuboidGeometry2D):
 		else:
 			print('rename: unidentified number of input')
 
-	@staticmethod #return N x 2 matrix 
-	def getMaterialCoords(materialNum,SuperGeometry):
+		self.materialCoordDic = {}
+		size_ = [1,self.materialMap.shape[0]*self.materialMap.shape[1]]
+
+		for material in set(numpy.reshape(self.materialMap,size_)[0]):
+			self.materialCoordDic[material] = self.getMaterialCoords(material)
+
+
+	def getMaterialCoords(self, materialNum):
 		materialCoords = numpy.zeros([0,2])
-		for x in numpy.arange(SuperGeometry.materialMap.shape[0]):
-			for y in numpy.arange(SuperGeometry.materialMap.shape[1]):
-				if SuperGeometry.materialMap[x][y] == materialNum:
+		for x in numpy.arange(self.materialMap.shape[0]):
+			for y in numpy.arange(self.materialMap.shape[1]):
+				if self.materialMap[x][y] == materialNum:
 					materialCoords = numpy.append(materialCoords,[[x,y]],0)
 		return numpy.int_(materialCoords)
-		
+
+
 	def print(self):
 		non_duplicate = list(map(numpy.unique, self.materialMap.reshape(1,self.materialMap.size)))
 
@@ -86,6 +94,8 @@ if __name__ == "__main__":
 	superG.rename(0,1,circle)
 	print(superG.materialMap)
 	superG.print()
+
+
 
 
 

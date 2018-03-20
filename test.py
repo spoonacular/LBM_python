@@ -23,8 +23,8 @@ class Foo(object):
 
 
 numpy.set_printoptions(3)
-nx = 200
-ny = 100
+nx = 400
+ny = 50
 center_x = 3
 center_y = 3
 radius = 2
@@ -33,6 +33,7 @@ omega = 1
 topPlate = Indicator.cuboid(0,ny,nx,ny) #x1,y1,x2,y2
 circle = Indicator.circle(center_x,center_y,radius)
 rightPlate = Indicator.cuboid(nx,0,nx,ny)
+leftPlate = Indicator.cuboid(0,0,0,ny)
 
 cGeometry = CuboidGeometry2D(0,0,nx,ny)
 cGeometry.setPeriodicity()
@@ -41,6 +42,7 @@ superG.rename(0,5,topPlate)
 superG.rename(0,1,circle)
 superG.rename(0,2)
 superG.rename(2,3,rightPlate)
+superG.rename(2,4,leftPlate)
 #print(superG.materialMap)
 superG.print()
 print('================================================')
@@ -49,7 +51,7 @@ rho = 1
 u = [0,0]
 sLattice = SuperLattice2D(superG)
 sLattice.defineRhoU(superG,1,rho,u)
-#print(sLattice.getRhoMap())
+sLattice.defineRhoU(superG,4,rho,u)
 sLattice.defineRhoU(superG,5,rho,u)
 sLattice.defineRhoU(superG,3,rho,u)
 sLattice.defineRhoU(superG,2,rho,u)
@@ -59,10 +61,13 @@ sLattice.defineRhoU(superG,2,rho,u)
 #print(sLattice.getUyMap())
 #print(sLattice.getSpeedMap())
 bulk1 = BGKdynamics(omega)
-bounceb = bounceBack()
+bounceb = BBwall()
+bbv = BBvelocity(omega)
+bbp = BBpressure(omega)
 sLattice.defineDynamics(superG,1,bulk1)# SuperGeometry, materialNum, dynamics
 sLattice.defineDynamics(superG,2,bulk1)
-sLattice.defineDynamics(superG,3,bulk1)
+sLattice.defineDynamics(superG,3,bbv)
+sLattice.defineDynamics(superG,4,bbp)
 sLattice.defineDynamics(superG,5,bounceb)
 #print(sLattice.dynamics)
 #print(sLattice.omega)
@@ -73,6 +78,9 @@ sLattice.defineDynamics(superG,5,bounceb)
 #print(sLattice.getRhoMap())
 maxVelocity = numpy.array([-0.1,0])
 poV = Poiseuille2D(superG,3,maxVelocity,0.5) #SuperGeometry,materialNum,maxVelocity,distance2Wall
+
+#print(superG.materialMap)
+
 
 @timeit
 def f1():
@@ -88,15 +96,20 @@ def collide(iter):
 ################################################################################################
 @timeit
 def stream(iter):
-	sLattice.stream()
+	for i in numpy.arange(iter):
+		sLattice.stream()
 @timeit
 def define(iter):
-	sLattice.defineU(superG,3,poV.getVelocityField())
+	for i in numpy.arange(iter):
+		sLattice.defineU_BC(superG,3,poV.getVelocityField())
+		sLattice.defineRho_BC(superG,4,1)
 
 f1()
-collide(1000)
-stream(10000)
-define(10000)
+
+collide(100)
+stream(100)
+define(100)
+
 Foo().foo()
 
 
