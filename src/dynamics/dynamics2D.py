@@ -18,18 +18,19 @@ class BGKdynamics():
 		self.index = 1
 		self.omega = omega #counterclockwise
 
-class bounceBack():
+class BBwall():
 	def __init__(self):
 		self.index = 2
 
-class velocityBoundary():
-	def __init__(self):
+class BBvelocity():
+	def __init__(self,omega):
 		self.index = 3
+		self.omega = 1
 
-class pressureBoundary():
-	def __init__(self):
+class BBpressure():
+	def __init__(self,omega):
 		self.index = 4
-
+		self.omega = 1
 class movingWall():
 	def __init__(self):
 		self.index = 5
