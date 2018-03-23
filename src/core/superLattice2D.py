@@ -1,5 +1,6 @@
 import sys
 import numpy
+import os
 if __name__ == "__main__":
 	sys.path[0] = '/'.join(sys.path[0].split('/')[0:-2]) #go up 2 level
 from src.geometry.Geometry2D import *
@@ -73,15 +74,13 @@ class SuperLattice2D(SuperGeometry):
 
 
 
-
-
 	def defineRhoU(self,SuperGeometry,materialNum,rho,u):
 		for coord in self.materialCoordsDic[materialNum]:
 			self.rhoMap[coord[0],coord[1]] = rho
 			self.UMap[coord[0],coord[1],0] = u[0]
 			self.UMap[coord[0],coord[1],1] = u[1]
 
-	def defineU_BC(self,SuperGeometry,materialNum,u,BCmethod = 'BB'):
+	def defineU_BC(self,SuperGeometry,materialNum,u,BCmethod = 'ZH'):
 		self.vloc = 0
 
 		#only support symmetrical velocity profile
@@ -96,30 +95,106 @@ class SuperLattice2D(SuperGeometry):
 				self.givenUFindRho(coord[0],coord[1],u[self.vloc,:],BCmethod)
 				self.vloc = self.vloc + 1
 
-	def defineRho_BC(self,SuperGeometry,materialNum,rho,BCmethod = 'BB'):
+
+	def defineRho_BC(self,SuperGeometry,materialNum,rho,BCmethod = 'ZH'):
 		for coord in self.materialCoordsDic[materialNum]:
 			self.rhoMap[coord[0],coord[1]] = rho
-			self.givenRhoFindU(coord[0],coord[1],BCmethod)
+			self.givenRhoFindU(coord[0],coord[1],rho,BCmethod)
 
 
-	def givenUFindRho(self,i,j,u,BCmethod):
+	def givenUFindRho(self,i,j,u,BCmethod): #need modidfication
 		#find rho
 		#arrow = self.findArrow(i,j)
 
-		if BCmethod == 'BB':
+		if BCmethod == 'ZH':
 			for p in numpy.arange(1,5):
 				if self.dynamics[(i+self.cx[p])%self.dynamics.shape[0],(j+self.cy[p])%self.dynamics.shape[1]] == 1:
 
-					self.rhoMap[i,j] = 1.5*self.rhoMap[i+self.cx[p],j+self.cy[p]] - 0.5*self.rhoMap[i+2*self.cx[p],j+2*self.cy[p]]
+					# self.rhoMap[i,j] = 1.5*self.rhoMap[i+self.cx[p],j+self.cy[p]] - 0.5*self.rhoMap[i+2*self.cx[p],j+2*self.cy[p]]
+					# # the following codes have sign error !!!!!!
+					if p == 1 : #left/west
+						self.rhoMap[i,j] = 1/(1-u[0])*(self.f[i,j,0]+self.f[i,j,2]+self.f[i,j,4]+2*(self.f[i,j,3]+self.f[i,j,6]+self.f[i,j,7]))
+						self.f[i,j,1] = self.f[i,j,3]+2/3*self.rhoMap[i,j]*u[0]
+						self.f[i,j,5] = self.f[i,j,7]-1/2*(self.f[i,j,2]-self.f[i,j,4])+1/6*self.rhoMap[i,j]*u[0]+1/2*self.rhoMap[i,j]*u[1]
+						self.f[i,j,8] = self.f[i,j,6]+1/2*(self.f[i,j,2]-self.f[i,j,4])+1/6*self.rhoMap[i,j]*u[0]-1/2*self.rhoMap[i,j]*u[1]
+					elif p == 2: #bottom/south
+						self.rhoMap[i,j] = 1/(1-u[1])*(self.f[i,j,0]+self.f[i,j,1]+self.f[i,j,3]+2*(self.f[i,j,4]+self.f[i,j,7]+self.f[i,j,8]))
+						self.f[i,j,2] = self.f[i,j,4]+2/3*self.rhoMap[i,j]*u[1]
+						self.f[i,j,5] = self.f[i,j,7]-1/2*(self.f[i,j,1]-self.f[i,j,3])+1/2*self.rhoMap[i,j]*u[0]+1/6*self.rhoMap[i,j]*u[1]
+						self.f[i,j,6] = self.f[i,j,8]+1/2*(self.f[i,j,1]-self.f[i,j,3])-1/2*self.rhoMap[i,j]*u[0]+1/6*self.rhoMap[i,j]*u[1]
+
+					elif p == 3: #right/east
+						#print(self.f[i,j,:])
+						self.rhoMap[i,j] = 1/(1+u[0])*(self.f[i,j,0]+self.f[i,j,2]+self.f[i,j,4]+2*(self.f[i,j,1]+self.f[i,j,5]+self.f[i,j,8]))
+						self.f[i,j,3] = self.f[i,j,1]-2/3*self.rhoMap[i,j]*u[0]
+						self.f[i,j,7] = self.f[i,j,5]+1/2*(self.f[i,j,2]-self.f[i,j,4])-1/6*self.rhoMap[i,j]*u[0]-1/2*self.rhoMap[i,j]*u[1]
+						self.f[i,j,6] = self.f[i,j,8]-1/2*(self.f[i,j,2]-self.f[i,j,4])-1/6*self.rhoMap[i,j]*u[0]+1/2*self.rhoMap[i,j]*u[1]
+						#print(self.rhoMap[i,j])
+					elif p == 4: #top/north
+						self.rhoMap[i,j] = 1/(1+u[1])*(self.f[i,j,0]+self.f[i,j,1]+self.f[i,j,3]+2*(self.f[i,j,2]+self.f[i,j,5]+self.f[i,j,6]))
+						self.f[i,j,4] = self.f[i,j,2]-2/3*self.rhoMap[i,j]*u[1]
+						self.f[i,j,7] = self.f[i,j,5]+1/2*(self.f[i,j,1]-self.f[i,j,3])-1/2*self.rhoMap[i,j]*u[0]-1/6*self.rhoMap[i,j]*u[1]
+						self.f[i,j,8] = self.f[i,j,6]-1/2*(self.f[i,j,1]-self.f[i,j,3])+1/2*self.rhoMap[i,j]*u[0]-1/6*self.rhoMap[i,j]*u[1]
+					# self.rhoMap[i,j] = self.f[i,j].sum()
+					# print(self.rhoMap[i,j])
 
 
-	def givenRhoFindU(self,i,j,BCmethod):
+	def givenRhoFindU(self,i,j,rho,BCmethod): #need modidfication
 		#find U
 		#arrow = findArrow(i,j)
-		if BCmethod == 'BB':
+		if BCmethod == 'ZH':
 			for p in numpy.arange(1,5):
 				if self.dynamics[(i+self.cx[p])%self.dynamics.shape[0],(j+self.cy[p])%self.dynamics.shape[1]] == 1:
-					self.UMap[i,j] = 1.5*self.UMap[i+self.cx[p],j+self.cy[p]]-0.5*self.UMap[i+2*self.cx[p],j+2*self.cy[p]]
+					# self.UMap[i,j] = 1.5*self.UMap[i+self.cx[p],j+self.cy[p]]-0.5*self.UMap[i+2*self.cx[p],j+2*self.cy[p]]
+					if p == 1:
+						self.UMap[i,j,0] = 1 - (self.f[i,j,0]+self.f[i,j,2]+self.f[i,j,4]+2*(self.f[i,j,3]+self.f[i,j,6]+self.f[i,j,7]))/rho
+						self.UMap[i,j,1] = 0
+						self.f[i,j,1] = self.f[i,j,3]+2/3*rho*self.UMap[i,j,0]
+						self.f[i,j,5] = self.f[i,j,7]-1/2*(self.f[i,j,2]-self.f[i,j,4])+1/6*rho*self.UMap[i,j,0]
+						self.f[i,j,8] = self.f[i,j,6]+1/2*(self.f[i,j,2]-self.f[i,j,4])+1/6*rho*self.UMap[i,j,0]
+					elif p == 2:
+						self.UMap[i,j,0] = 0
+						self.UMap[i,j,1] = 1 - (self.f[i,j,0]+self.f[i,j,1]+self.f[i,j,3]+2*(self.f[i,j,4]+self.f[i,j,7]+self.f[i,j,8]))/rho
+						self.f[i,j,2] = self.f[i,j,4]+2/3*rho*self.UMap[i,j,1]
+						self.f[i,j,5] = self.f[i,j,7]-1/2*(self.f[i,j,1]-self.f[i,j,3])+1/6*rho*self.UMap[i,j,1]
+						self.f[i,j,6] = self.f[i,j,8]+1/2*(self.f[i,j,1]-self.f[i,j,3])+1/6*rho*self.UMap[i,j,1]
+					elif p == 3:
+						#print('good')
+						self.UMap[i,j,0] = -1 + (self.f[i,j,0]+self.f[i,j,2]+self.f[i,j,4]+2*(self.f[i,j,1]+self.f[i,j,5]+self.f[i,j,8]))/rho
+						self.UMap[i,j,1] = 0
+						self.f[i,j,3] = self.f[i,j,1]-2/3*rho*self.UMap[i,j,0]
+						self.f[i,j,7] = self.f[i,j,5]+1/2*(self.f[i,j,2]-self.f[i,j,4])-1/6*rho*self.UMap[i,j,0]
+						self.f[i,j,6] = self.f[i,j,8]-1/2*(self.f[i,j,2]-self.f[i,j,4])-1/6*rho*self.UMap[i,j,0]
+					elif p == 4:
+						self.UMap[i,j,0] = 0
+						self.UMap[i,j,1] = -1 + (self.f[i,j,0]+self.f[i,j,1]+self.f[i,j,3]+2*(self.f[i,j,2]+self.f[i,j,5]+self.f[i,j,6]))/rho
+						self.f[i,j,4] = self.f[i,j,2]-2/3*rho*self.UMap[i,j,1]
+						self.f[i,j,7] = self.f[i,j,5]+1/2*(self.f[i,j,1]-self.f[i,j,3])-1/6*rho*self.UMap[i,j,1]
+						self.f[i,j,8] = self.f[i,j,6]-1/2*(self.f[i,j,1]-self.f[i,j,3])-1/6*rho*self.UMap[i,j,1]
+	
+	def openBC(self,SuperGeometry,materialNum):
+		for coord in self.materialCoordsDic[materialNum]:
+			for p in numpy.arange(1,5):
+				if self.dynamics[(coord[0]+self.cx[p])%self.dynamics.shape[0],(coord[1]+self.cy[p])%self.dynamics.shape[1]] == 1:
+					if p == 1:
+						#print(2 * self.f[coord[0]+self.cx[p],coord[1]+self.cy[p],1] - self.f[coord[0]+2*self.cx[p],coord[1]+2*self.cy[p],1])
+						self.f[coord[0],coord[1],1] = 2 * self.f[coord[0]+self.cx[p],coord[1]+self.cy[p],1] - self.f[coord[0]+2*self.cx[p],coord[1]+2*self.cy[p],1]
+						self.f[coord[0],coord[1],5] = 2 * self.f[coord[0]+self.cx[p],coord[1]+self.cy[p],5] - self.f[coord[0]+2*self.cx[p],coord[1]+2*self.cy[p],5]
+						self.f[coord[0],coord[1],8] = 2 * self.f[coord[0]+self.cx[p],coord[1]+self.cy[p],8] - self.f[coord[0]+2*self.cx[p],coord[1]+2*self.cy[p],8]
+					elif p == 2:
+						self.f[coord[0],coord[1],2] = 2 * self.f[coord[0]+self.cx[p],coord[1]+self.cy[p],2] - self.f[coord[0]+2*self.cx[p],coord[1]+2*self.cy[p],2]
+						self.f[coord[0],coord[1],5] = 2 * self.f[coord[0]+self.cx[p],coord[1]+self.cy[p],5] - self.f[coord[0]+2*self.cx[p],coord[1]+2*self.cy[p],5]
+						self.f[coord[0],coord[1],6] = 2 * self.f[coord[0]+self.cx[p],coord[1]+self.cy[p],6] - self.f[coord[0]+2*self.cx[p],coord[1]+2*self.cy[p],6]
+					elif p == 3:
+						self.f[coord[0],coord[1],3] = 2 * self.f[coord[0]+self.cx[p],coord[1]+self.cy[p],3] - self.f[coord[0]+2*self.cx[p],coord[1]+2*self.cy[p],3]
+						self.f[coord[0],coord[1],7] = 2 * self.f[coord[0]+self.cx[p],coord[1]+self.cy[p],7] - self.f[coord[0]+2*self.cx[p],coord[1]+2*self.cy[p],7]
+						self.f[coord[0],coord[1],6] = 2 * self.f[coord[0]+self.cx[p],coord[1]+self.cy[p],6] - self.f[coord[0]+2*self.cx[p],coord[1]+2*self.cy[p],6]
+					elif p == 4:
+						self.f[coord[0],coord[1],4] = 2 * self.f[coord[0]+self.cx[p],coord[1]+self.cy[p],4] - self.f[coord[0]+2*self.cx[p],coord[1]+2*self.cy[p],4]
+						self.f[coord[0],coord[1],7] = 2 * self.f[coord[0]+self.cx[p],coord[1]+self.cy[p],7] - self.f[coord[0]+2*self.cx[p],coord[1]+2*self.cy[p],7]
+						self.f[coord[0],coord[1],8] = 2 * self.f[coord[0]+self.cx[p],coord[1]+self.cy[p],8] - self.f[coord[0]+2*self.cx[p],coord[1]+2*self.cy[p],8]
+
+
 
 	def findArrow(self,i,j):
 		arrow = numpy.zeros(8)
@@ -142,21 +217,24 @@ class SuperLattice2D(SuperGeometry):
 		if self.initialization == 0:
 			self.initialize_()
 
-		self.BGKcollide()
-
-
-
-
+		self.updateRhoU() #13
+		self.BGKcollide() #25
 
 	def BGKcollide(self):
+
 		self.t1 = self.UMap[:,:,0]*self.UMap[:,:,0] + self.UMap[:,:,1]*self.UMap[:,:,1]
 		if not hasattr(self,'t2'):
 			self.t2 = numpy.zeros(self.f.shape)
-		for k in numpy.arange(9):
-			self.t2[:,:,k] = self.UMap[:,:,0]*self.cx[k]+self.UMap[:,:,1]*self.cy[k]
-			self.feq[:,:,k] = self.rhoMap*self.distribution[k]*(1+3*self.t2[:,:,k]+4.5*self.t2[:,:,k]*self.t2[:,:,k]-1.5*self.t1)
 
+		self.t2 = self.UMap[:,:,0]*numpy.swapaxes([[self.cx]],0,2)+self.UMap[:,:,1]*numpy.swapaxes([[self.cy]],0,2)
+		self.feq = self.rhoMap*numpy.swapaxes([[self.distribution]],0,2)*(1+3*self.t2+4.5*self.t2*self.t2-1.5*self.t1)
+		self.feq = numpy.swapaxes(numpy.swapaxes(self.feq,0,1),1,2)
+
+		# for k in numpy.arange(9):
+		# 	self.t2[:,:,k] = self.UMap[:,:,0]*self.cx[k]+self.UMap[:,:,1]*self.cy[k]
+		# 	self.feq[:,:,k] = self.rhoMap*self.distribution[k]*(1+3*self.t2[:,:,k]+4.5*self.t2[:,:,k]*self.t2[:,:,k]-1.5*self.t1)
 		self.f = self.f + self.omega_9*(self.feq - self.f)
+
 
 
 	def stream(self):
@@ -167,6 +245,8 @@ class SuperLattice2D(SuperGeometry):
 		# 			for k in numpy.arange(1,9):
 		# 				#if self.surrundingDynamics[i,j,k] in [1,3,4]: #half way bounceback: modify f on near bulk fluids
 		# 				self.f[i,j,k] = self.f[(i+self.cx[k])%self.f.shape[0],(j+self.cy[k])%self.f.shape[1],self.opposite[k]] 
+
+		
 
 		#pre-stream for bounceBack
 		self.tmp_f = self.f.copy()
@@ -179,7 +259,9 @@ class SuperLattice2D(SuperGeometry):
 			self.f[:,:,k] = numpy.roll(numpy.roll(self.f[:,:,k],self.cx[k],0),self.cy[k],1)
 
 		#calculate rhoMap given f after stream
-		self.updateRhoU() 
+		
+
+
 
 	def updateRhoU(self):
 		self.rhoMap = self.f.sum(2)
@@ -235,12 +317,11 @@ class SuperLattice2D(SuperGeometry):
 		return numpy.int_(dynamicsCoords)
 
 
-
 if __name__ == "__main__":
 	#parameters
 	numpy.set_printoptions(3)
-	nx = 11
-	ny = 5
+	nx = 30
+	ny = 10
 	center_x = 3
 	center_y = 3
 	radius = 2
@@ -281,41 +362,52 @@ if __name__ == "__main__":
 
 	sLattice.defineDynamics(superG,1,bulk1)# SuperGeometry, materialNum, dynamics
 	sLattice.defineDynamics(superG,2,bulk1)
-	sLattice.defineDynamics(superG,3,BBvelocity(omega))
-	sLattice.defineDynamics(superG,4,BBpressure(omega))
+	sLattice.defineDynamics(superG,4,BBvelocity(omega))
+	#sLattice.defineDynamics(superG,4,BBpressure(omega))
+	sLattice.defineDynamics(superG,3,BBpressure(omega))
 	sLattice.defineDynamics(superG,5,BBwall())
-
-
 
 	#print(sLattice.dynamics)
 	#print(sLattice.omega)
 	#print(sLattice.dynamics)
 
 	#print(sLattice.getUyMap())
+
+
+
+	outputDirectory = 'data'
+	if not os.path.exists(outputDirectory):
+		os.makedirs(outputDirectory)
+
+	
 	print('initial average rho: {}'.format(sLattice.getAverageRho()))
-	maxVelocity = numpy.array([-0.1,0])
+	maxVelocity = numpy.array([0.1,0])
 	#poV = Poiseuille2D(superG,3,maxVelocity,0.5).getVelocityField() #SuperGeometry,materialNum,maxVelocity,distance2Wall
-	poV = numpy.array([-0.1,0])
-	sLattice.defineU_BC(superG,3,poV)
-	sLattice.defineRho_BC(superG,4,1)
+	poV = numpy.array(maxVelocity)
 
+	sLattice.defineU_BC(superG,4,poV)
+	sLattice.defineRho_BC(superG,3,1)
+	#sLattice.openBC(superG,4)
 	#print('initial Ux:\n{}\n==============================='.format(sLattice.getUxMap()))
-
-	print(sLattice.getUxMap())
 	numpy.set_printoptions(3)
 
-	print(sLattice.initialization)
-	for i in numpy.arange(1000):
-		if i%100 == 0:
-			print('{}/1000'.format(i))
+
+	print(sLattice.getUxMap())
+	print(sLattice.rhoMap)
+	for iT in numpy.arange(1000 ):
+		# if iT%1000 == 0:
+		# 	print('{}/1000'.format(iT))
+		# 	print(sLattice.getUxMap())
 
 		sLattice.collide()
 		sLattice.stream()
-		sLattice.defineU_BC(superG,3,poV)
-		sLattice.defineRho_BC(superG,4,1)
-
-
-
+		sLattice.defineU_BC(superG,4,poV)
+		sLattice.defineRho_BC(superG,3,1)
+		#sLattice.defineRho_BC(superG,3,1)
+		#sLattice.openBC(superG,4)
+		# if iT%500==0:
+		# 	numpy.savetxt('{}/VelocityProfile_{}'.format(outputDirectory,iT),sLattice.getUxMap())
+		# 	print('{}/10000'.format(iT))
 
 		#print(sLattice.getUxMap())
 		#print(sLattice.getAverageRho())
@@ -325,7 +417,8 @@ if __name__ == "__main__":
 	#print(sLattice.surrundingDynamics[:,:,1])
 
 	#print(sLattice.f[:,:,1])
-	print('final Ux:\n{}\n==============================='.format(sLattice.getUxMap()))
+	print('===============================final Ux:\n{}\n'.format(sLattice.getUxMap()))
+	print('===============================final Uy:\n{}\n'.format(sLattice.getUyMap()))
 	#print(sLattice.getUyMap())
 	#print(sLattice.getRhoMap())
 	#print(sLattice.getRhoMap().sum())
@@ -333,5 +426,6 @@ if __name__ == "__main__":
 	print(sLattice.getRhoMap())
 
 	#print(sLattice.dynamics)
-	print(sLattice.f.shape)
 	#numpy.savetxt('tmp_file_Ux.txt',sLattice.getUxMap())
+	#print(sLattice.dynamics)
+
