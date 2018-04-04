@@ -1,17 +1,36 @@
-import numpy
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
-y = numpy.array([1,2,3])
-x = numpy.zeros([10,5])+1
-z = x*numpy.swapaxes([[y]],0,2)
-
-t = numpy.array([[1,2,3],[4,5,6],[7,8,9]])
+fig = plt.figure()
 
 
+def f(x, y):
+    return np.sin(x) + np.cos(y)
 
-print(t)
-print(numpy.roll(t,-1,1))
+x = np.linspace(0, 2 * np.pi, 120)
+y = np.linspace(0, 2 * np.pi, 100).reshape(-1, 1)
+# ims is a list of lists, each row is a list of artists to draw in the
+# current frame; here we are just animating one artist, the image, in
+# each frame
+ims = []
+for i in range(60):
+    x += np.pi / 15.
+    y += np.pi / 20.
+    
+    ims.append([im])
 
+ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True,
+                                repeat_delay=1000)
 
-w = 1
+# To save the animation, use e.g.
+#
+# ani.save("movie.mp4")
+#
+# or
+#
+# from matplotlib.animation import FFMpegWriter
+# writer = FFMpegWriter(fps=15, metadata=dict(artist='Me'), bitrate=1800)
+# ani.save("movie.mp4", writer=writer)
 
-print('%.2f'.format(w))
+plt.show()

@@ -313,14 +313,9 @@ class SuperLattice2D(SuperGeometry):
 			self.rhoContribX = self.rhoContribX - numpy.roll(numpy.roll(self.tmp_rho[k,:,:],self.cx[k],0),self.cy[k],1) * self.cx[k]
 			self.rhoContribY = self.rhoContribY - numpy.roll(numpy.roll(self.tmp_rho[k,:,:],self.cx[k],0),self.cy[k],1) * self.cy[k]
 
-
-
 			# # or: 
 			# self.rhoContribX = self.rhoContribX + numpy.roll(numpy.roll(self.tmp_rho[k,:,:],self.cx[self.opposite[k]],0),self.cy[self.opposite[k]],1) * self.cx[k]
 			# self.rhoContribY = self.rhoContribY + numpy.roll(numpy.roll(self.tmp_rho[k,:,:],self.cx[self.opposite[k]],0),self.cy[self.opposite[k]],1) * self.cy[k]
-
-
-
 
 	def executeCoupling(self,SuperLattice2D):
 
@@ -344,13 +339,11 @@ if __name__ == "__main__":
 	center_x = 5
 	center_y = 5
 	radius = 2
-
-	omega1 = 0.55
-	omega2 = 0.55
+	omega1 = 1.5
+	omega2 = 1.5
 	#define geometry
 	circle = Indicator.circle(center_x,center_y,radius)
 	centerBox = Indicator.cuboid(80,80,120,120)
-
 	cGeometry = CuboidGeometry2D(0,0,nx,ny)
 	cGeometry.setPeriodicity()
 	superG = SuperGeometry(cGeometry)
@@ -389,12 +382,8 @@ if __name__ == "__main__":
 	print('initial average rho1: {0:.5f}'.format(sLattice1.getAverageRho())) #initialize
 	print('initial average rho2: {0:.5f}'.format(sLattice2.getAverageRho()))
 	# maxVelocity = numpy.array([0.01,0])
-	#poV = Poiseuille2D(superG,3,maxVelocity,0.5).getVelocityField() #SuperGeometry,materialNum,maxVelocity,distance2Wall
+	# poV = Poiseuille2D(superG,3,maxVelocity,0.5).getVelocityField() #SuperGeometry,materialNum,maxVelocity,distance2Wall
 	# poV = numpy.array(maxVelocity)
-
-	numpy.set_printoptions(3)
-
-
 
 	G = 3
 	sLattice1.addLatticeCoupling(superG,G,sLattice2)
@@ -411,16 +400,18 @@ if __name__ == "__main__":
 		# sLattice.defineRho_BC(superG,3,1)
 
 		if iT%100==0:
-			numpy.savetxt('{}/rho1_{}'.format(outputDirectory,iT),sLattice1.getRhoMap())
-			print('{}/5000'.format(iT))
+			print(sLattice1.omega)
+			print(sLattice2.omega)
+			# numpy.savetxt('{}/rho1_{}'.format(outputDirectory,iT),sLattice1.getRhoMap())
+			# print('{}/5000'.format(iT))
 
 
 		sLattice1.prepareCoupling()
 		sLattice2.prepareCoupling()
 		sLattice1.executeCoupling(sLattice2)
 
-		sLattice1.collide() #update rhoU, collide
-		sLattice2.collide() #update rhoU, collide
+		sLattice1.collide() 
+		sLattice2.collide() 
 		sLattice1.stream()
 		sLattice2.stream()	
 		
