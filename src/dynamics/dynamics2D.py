@@ -35,6 +35,32 @@ class movingWall():
 	def __init__(self):
 		self.index = 5
 
+
+class ShanChenBGKdynamics():
+	def __init__(self,omega):
+		self.index = 1
+		self.omega = omega
+
+
+
+
+class ShanChenGenerator():
+	def __init__(self,G,interactionPotential):
+		self.G = G
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	# def calEqulibriumFunction(self,df):
 
 	# 	for i in range(nx):

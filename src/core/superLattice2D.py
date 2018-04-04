@@ -16,21 +16,20 @@ class SuperLattice2D(SuperGeometry):
 		self.cy = 			numpy.array([  0,   0,  1,  0, -1,    1,   1,  -1,  -1])
 		self.opposite = 	numpy.array([  0,   3,  4,  1,  2,    7,   8,   5,   6]) #should be moved to boundary condition part
 		self.dynamics = numpy.zeros([SuperGeometry.materialMap.shape[0],SuperGeometry.materialMap.shape[1]])
-		self.omega = numpy.zeros([SuperGeometry.materialMap.shape[0],SuperGeometry.materialMap.shape[1]]) #omega = 1/tau, which determines the kinematic viscosity
+		#self.omega = numpy.zeros([SuperGeometry.materialMap.shape[0],SuperGeometry.materialMap.shape[1]]) #omega = 1/tau, which determines the kinematic viscosity
 		self.initialization = 0
 		self.rhoMap = numpy.zeros([SuperGeometry.materialMap.shape[0],SuperGeometry.materialMap.shape[1]])
 		self.UMap = numpy.zeros([SuperGeometry.materialMap.shape[0],SuperGeometry.materialMap.shape[1],2])# velocity field
-		self.materialCoordsDic  = SuperGeometry.materialCoordDic #coordinates for each material number
+		self.materialCoordsDic  = SuperGeometry.materialCoordsDic #coordinates for each material number
 		self.materialMap = SuperGeometry.materialMap
-
 
 	def defineDynamics(self, SuperGeometry, materialNum, dynamics):
 		for coord in self.materialCoordsDic[materialNum]:
 			self.dynamics[coord[0],coord[1]] = dynamics.index
 			if hasattr(dynamics, 'omega'):
-				self.omega[coord[0],coord[1]] = dynamics.omega
+				self.omega = dynamics.omega
 			else:
-				self.omega[coord[0],coord[1]] = 0
+				self.omega = 0
 
 			# indexlist:
 			#		index = 0: noDynamics
@@ -52,13 +51,12 @@ class SuperLattice2D(SuperGeometry):
 		#define number of bulk lattices
 		self.numBulkLattices = self.dynamics[self.dynamics == 1].sum()
 		# increase speed with cost of mem
-		self.omega_9 = numpy.zeros([self.omega.shape[0],self.omega.shape[1],9]) 
 		self.cx_9 = numpy.zeros(self.f.shape)
 		self.cy_9 = numpy.zeros(self.f.shape)
 		for i in numpy.arange(9):
 			self.cx_9[:,:,i] = self.cx[i]
 			self.cy_9[:,:,i] = self.cy[i]
-			self.omega_9[:,:,i] = self.omega
+
 		
 		# self.dynamicsCoordsDic = {}
 		# size_ = [1,self.dynamics.shape[0]*self.dynamics.shape[1]]
@@ -215,17 +213,14 @@ class SuperLattice2D(SuperGeometry):
 	def BGKcollide(self):
 
 		self.t1 = self.UMap[:,:,0]*self.UMap[:,:,0] + self.UMap[:,:,1]*self.UMap[:,:,1]
-		if not hasattr(self,'t2'):
-			self.t2 = numpy.zeros(self.f.shape)
-
-		self.t2 = self.UMap[:,:,0]*numpy.swapaxes([[self.cx]],0,2)+self.UMap[:,:,1]*numpy.swapaxes([[self.cy]],0,2)
-		self.feq = self.rhoMap*numpy.swapaxes([[self.distribution]],0,2)*(1+3*self.t2+4.5*self.t2*self.t2-1.5*self.t1)
-		self.feq = numpy.swapaxes(numpy.swapaxes(self.feq,0,1),1,2)
+		self.t2 = self.UMap[:,:,0]*numpy.swapaxes([[self.cx]],0,2)+self.UMap[:,:,1]*numpy.swapaxes([[self.cy]],0,2) # (9,x,y)
+		self.feq = self.rhoMap*numpy.swapaxes([[self.distribution]],0,2)*(1+3*self.t2+4.5*self.t2*self.t2-1.5*self.t1) # (9,x,y)
+		self.feq = numpy.swapaxes(numpy.swapaxes(self.feq,0,1),1,2) # (x,y,9)
 
 		# for k in numpy.arange(9):
 		# 	self.t2[:,:,k] = self.UMap[:,:,0]*self.cx[k]+self.UMap[:,:,1]*self.cy[k]
 		# 	self.feq[:,:,k] = self.rhoMap*self.distribution[k]*(1+3*self.t2[:,:,k]+4.5*self.t2[:,:,k]*self.t2[:,:,k]-1.5*self.t1)
-		self.f = self.f + self.omega_9*(self.feq - self.f)
+		self.f = self.f + self.omega*(self.feq - self.f)
 
 	def stream(self):
 		#bounceback 2 # 75% computation time
@@ -266,13 +261,6 @@ class SuperLattice2D(SuperGeometry):
 					self.averageRho = self.averageRho + self.rhoMap[i,j]
 		return self.averageRho/self.numBulkLattices
 
-
-	def communicate(self):
-		pass
-
-	def executeCoupling(self):
-		pass
-
 	def getRhoMap(self):
 		if 2 in self.dynamics:
 			for coord in self.getDynamicsCoords(2):
@@ -304,125 +292,151 @@ class SuperLattice2D(SuperGeometry):
 					dynamicsCoords = numpy.append(dynamicsCoords,[[x,y]],0)
 		return numpy.int_(dynamicsCoords)
 
+	def addLatticeCoupling(self,SuperGeometry,G,SuperLattice2D):
+		self.G = G
+		self.G_omega = G/self.omega
+		SuperLattice2D.G_omega = G/SuperLattice2D.omega
+
+	def prepareCoupling(self):
+		#calculate moment
+		self.rhoMap = self.f.sum(2)
+		self.momentX = (self.cx * self.f).sum(2) # (x,y)
+		self.momentY = (self.cy * self.f).sum(2) # (x,y)
+
+		self.tmp_rho = self.rhoMap * numpy.swapaxes([[self.distribution]],0,2) # (9,x,y)
+
+		self.rhoContribX =  numpy.zeros(self.rhoMap.shape)
+		self.rhoContribY =  numpy.zeros(self.rhoMap.shape)
+		for k in numpy.arange(1,9):  # SC force component excluding " -Psi*G "
+
+
+			self.rhoContribX = self.rhoContribX - numpy.roll(numpy.roll(self.tmp_rho[k,:,:],self.cx[k],0),self.cy[k],1) * self.cx[k]
+			self.rhoContribY = self.rhoContribY - numpy.roll(numpy.roll(self.tmp_rho[k,:,:],self.cx[k],0),self.cy[k],1) * self.cy[k]
+
+
+
+			# # or: 
+			# self.rhoContribX = self.rhoContribX + numpy.roll(numpy.roll(self.tmp_rho[k,:,:],self.cx[self.opposite[k]],0),self.cy[self.opposite[k]],1) * self.cx[k]
+			# self.rhoContribY = self.rhoContribY + numpy.roll(numpy.roll(self.tmp_rho[k,:,:],self.cx[self.opposite[k]],0),self.cy[self.opposite[k]],1) * self.cy[k]
+
+
+
+
+	def executeCoupling(self,SuperLattice2D):
+
+		self.totalRho_omega = self.rhoMap*self.omega + SuperLattice2D.rhoMap*SuperLattice2D.omega
+
+		self.commonUx = (self.momentX*self.omega + SuperLattice2D.momentX*SuperLattice2D.omega)/ self.totalRho_omega
+		self.commonUy = (self.momentY*self.omega + SuperLattice2D.momentY*SuperLattice2D.omega)/ self.totalRho_omega
+
+		self.UMap[:,:,0] = self.commonUx - self.G_omega*SuperLattice2D.rhoContribX
+		self.UMap[:,:,1] = self.commonUy - self.G_omega*SuperLattice2D.rhoContribY
+		SuperLattice2D.UMap[:,:,0] = self.commonUx - SuperLattice2D.G_omega*self.rhoContribX
+		SuperLattice2D.UMap[:,:,1] = self.commonUy - SuperLattice2D.G_omega*self.rhoContribY
+
 
 if __name__ == "__main__":
-	if 1:
-		#parameters
-		numpy.set_printoptions(3)
-		nx = 30
-		ny = 8
-		center_x = 3
-		center_y = 3
-		radius = 2
-		omega = 1
-		#define geometry
-		topPlate = Indicator.cuboid(0,ny,nx,ny) #x1,y1,x2,y2
-		circle = Indicator.circle(center_x,center_y,radius)
-		rightPlate = Indicator.cuboid(nx,0,nx,ny)
-		leftPlate = Indicator.cuboid(0,0,0,ny)
 
-		cGeometry = CuboidGeometry2D(0,0,nx,ny)
-		cGeometry.setPeriodicity()
-		superG = SuperGeometry(cGeometry)
-		superG.rename(0,5,topPlate)
-		superG.rename(0,1,circle)
-		superG.rename(0,2)
-		superG.rename(2,3,rightPlate)
-		superG.rename(2,4,leftPlate)
-		#print(superG.materialMap)
-		#superG.print()
-		print('================================================')
-		#lattice
-		rho = 1
-		u = [0,0.]
-		sLattice = SuperLattice2D(superG)
-		sLattice.defineRhoU(superG,1,rho,u)
-		sLattice.defineRhoU(superG,2,rho,u)
-		sLattice.defineRhoU(superG,3,rho,u)
-		sLattice.defineRhoU(superG,4,rho,u)
-		sLattice.defineRhoU(superG,5,rho,u)
-		#print(sLattice.getRhoMap())
-		#print(sLattice.getRhoMap().sum())
-		#print(sLattice.getUxMap())
-		#print(sLattice.getUyMap())
-		#print(sLattice.getSpeedMap())
-		bulk1 = BGKdynamics(omega)
-		
+	#parameters
+	numpy.set_printoptions(3)
+	nx = 200
+	ny = 200
+	center_x = 5
+	center_y = 5
+	radius = 2
 
-		sLattice.defineDynamics(superG,1,bulk1)# SuperGeometry, materialNum, dynamics
-		sLattice.defineDynamics(superG,2,bulk1)
-		sLattice.defineDynamics(superG,4,BBvelocity(omega))
-		#sLattice.defineDynamics(superG,4,BBpressure(omega))
-		sLattice.defineDynamics(superG,3,BBpressure(omega))
-		#sLattice.defineDynamics(superG,5,bulk1)
-		sLattice.defineDynamics(superG,5,BBwall())
+	omega1 = 0.55
+	omega2 = 0.55
+	#define geometry
+	circle = Indicator.circle(center_x,center_y,radius)
+	centerBox = Indicator.cuboid(80,80,120,120)
 
-		#print(sLattice.dynamics)
-		#print(sLattice.omega)
-		#print(sLattice.dynamics)
+	cGeometry = CuboidGeometry2D(0,0,nx,ny)
+	cGeometry.setPeriodicity()
+	superG = SuperGeometry(cGeometry)
+	superG.rename(0,1)
+	superG.rename(1,2,centerBox)
 
-		#print(sLattice.getUyMap())
+	print('================================================')
+	#lattice
+	rho = 1
+	rhoZero = 0
+	u = [0,0.]
+	sLattice1 = SuperLattice2D(superG)
+	sLattice2 = SuperLattice2D(superG)
+
+	sLattice1.defineRhoU(superG,1,rho,u)
+	sLattice1.defineRhoU(superG,2,rhoZero,u)
+
+	sLattice2.defineRhoU(superG,1,rhoZero,u)
+	sLattice2.defineRhoU(superG,2,rho,u)
 
 
+	bulk1 = ShanChenBGKdynamics(omega1)
+	bulk2 = ShanChenBGKdynamics(omega2)
 
-		outputDirectory = 'data'
-		if not os.path.exists(outputDirectory):
-			os.makedirs(outputDirectory)
+	sLattice1.defineDynamics(superG,1,bulk1)# SuperGeometry, materialNum, dynamics
+	sLattice1.defineDynamics(superG,2,bulk1)
+	sLattice2.defineDynamics(superG,1,bulk2)
+	sLattice2.defineDynamics(superG,2,bulk2)
 
-		
-		print('initial average rho: {}'.format(sLattice.getAverageRho()))
-		maxVelocity = numpy.array([0.01,0])
-		#poV = Poiseuille2D(superG,3,maxVelocity,0.5).getVelocityField() #SuperGeometry,materialNum,maxVelocity,distance2Wall
-		poV = numpy.array(maxVelocity)
+
+	outputDirectory = 'data'
+	if not os.path.exists(outputDirectory):
+		os.makedirs(outputDirectory)
+
+	
+	print('initial average rho1: {0:.5f}'.format(sLattice1.getAverageRho())) #initialize
+	print('initial average rho2: {0:.5f}'.format(sLattice2.getAverageRho()))
+	# maxVelocity = numpy.array([0.01,0])
+	#poV = Poiseuille2D(superG,3,maxVelocity,0.5).getVelocityField() #SuperGeometry,materialNum,maxVelocity,distance2Wall
+	# poV = numpy.array(maxVelocity)
+
+	numpy.set_printoptions(3)
+
+
+
+	G = 3
+	sLattice1.addLatticeCoupling(superG,G,sLattice2)
+
+	# MAIN LOOP
+	for iT in numpy.arange( 5000 ):
+
+		# sLattice.openBC(superG,3)
+		# sLattice1.updateRhoU() #13 #needed for defineU_BC / defineRho_BC
+		# sLattice2.updateRhoU() #13
+
 
 		# sLattice.defineU_BC(superG,4,poV)
 		# sLattice.defineRho_BC(superG,3,1)
-		#sLattice.openBC(superG,4)
-		#print('initial Ux:\n{}\n==============================='.format(sLattice.getUxMap()))
-		numpy.set_printoptions(3)
+
+		if iT%100==0:
+			numpy.savetxt('{}/rho1_{}'.format(outputDirectory,iT),sLattice1.getRhoMap())
+			print('{}/5000'.format(iT))
 
 
-		print(sLattice.getUxMap())
-		print(sLattice.rhoMap) #settings
+		sLattice1.prepareCoupling()
+		sLattice2.prepareCoupling()
+		sLattice1.executeCoupling(sLattice2)
 
-	# MAIN LOOP
-	for iT in numpy.arange( 1000 ):
-		# if iT%1000 == 0:
-		# 	print('{}/1000'.format(iT))
-		# 	print(sLattice.getUxMap())
-		# sLattice.openBC(superG,3)
-		sLattice.updateRhoU() #13
-		sLattice.defineU_BC(superG,4,poV)
-		sLattice.defineRho_BC(superG,3,1)
+		sLattice1.collide() #update rhoU, collide
+		sLattice2.collide() #update rhoU, collide
+		sLattice1.stream()
+		sLattice2.stream()	
+		
+	# print('===============================final Ux:\n{}\n'.format(sLattice1.getUxMap()))
 
+	print('final average rho1: {0:.5f}'.format(sLattice1.getAverageRho()))
+	print('final average rho2: {0:.5f}'.format(sLattice2.getAverageRho()))
 
-		sLattice.collide() #update rhoU, collide
-		sLattice.stream()
+	# for i in numpy.arange(sLattice1.rhoMap.shape[0]):
+	# 	for j in numpy.arange(sLattice1.rhoMap.shape[1]):
+	# 		print('%10.4f' %sLattice1.rhoMap[i,j],end='')
+	# 	print('')
 
-
-		#sLattice.defineRho_BC(superG,3,1)
-		#sLattice.openBC(superG,4)
-		# if iT%500==0:
-		# 	numpy.savetxt('{}/VelocityProfile_{}'.format(outputDirectory,iT),sLattice.getUxMap())
-		# 	print('{}/10000'.format(iT))
-
-		#print(sLattice.getUxMap())
-		#print(sLattice.getAverageRho())
-	#print(poV.getVelocityField())
-
-	#print(sLattice.dynamics)
-	#print(sLattice.surrundingDynamics[:,:,1])
-
-	#print(sLattice.f[:,:,1])
-	print('===============================final Ux:\n{}\n'.format(sLattice.getUxMap()))
-	#print('===============================final Uy:\n{}\n'.format(sLattice.getUyMap()))
-	#print(sLattice.getUyMap())
-	#print(sLattice.getRhoMap())
-	#print(sLattice.getRhoMap().sum())
-	print('final average rho: {}'.format(sLattice.getAverageRho()))
-	print(sLattice.getRhoMap())
-
-	#print(sLattice.dynamics)
-	#numpy.savetxt('tmp_file_Ux.txt',sLattice.getUxMap())
-	#print(sLattice.dynamics)
+	# print('=========================================================================================')
+	# for i in numpy.arange(sLattice1.rhoMap.shape[0]):
+	# 	for j in numpy.arange(sLattice1.rhoMap.shape[1]):
+	# 		print('%10.4f' %sLattice2.rhoMap[i,j],end='')
+	# 	print('')
 

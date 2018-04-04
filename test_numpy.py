@@ -1,6 +1,17 @@
 import numpy
 
+y = numpy.array([1,2,3])
+x = numpy.zeros([10,5])+1
+z = x*numpy.swapaxes([[y]],0,2)
 
-x = numpy.array([[1,2,3,4,5,6,7],[7,6,5,4,3,2,1]])
+t = numpy.array([[1,2,3],[4,5,6],[7,8,9]])
 
-print(x[0,2:6])
+
+
+print(t)
+print(numpy.roll(t,-1,1))
+
+
+w = 1
+
+print('%.2f'.format(w))
