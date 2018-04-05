@@ -1,4 +1,4 @@
-import numpy
+import numpy`
 import sys
 if __name__ == "__main__":
 	sys.path[0] = '/'.join(sys.path[0].split('/')[0:-2]) #go up 2 level

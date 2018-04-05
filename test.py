@@ -104,11 +104,25 @@ def define(iter):
 		sLattice.defineU_BC(superG,3,poV.getVelocityField())
 		sLattice.defineRho_BC(superG,4,1)
 
-f1()
+@timeit
+def ifcheck(iter,x):
+	for i in numpy.arange(iter):
+		if x == 1:
+			y = 1
 
+
+
+@timeit
+def hascheck(iter,clss):
+	if hasattr(clss,'testattri'):
+		y = 1
+
+
+f1()
 collide(100)
 stream(100)
 define(100)
+
 
 Foo().foo()
 

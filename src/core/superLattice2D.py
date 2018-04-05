@@ -83,6 +83,14 @@ class SuperLattice2D(SuperGeometry):
 			self.UMap[coord[0],coord[1],0] = u[0]
 			self.UMap[coord[0],coord[1],1] = u[1]
 
+	def defineExternalField(self,SuperGeometry,materialNum,force): #force = [Fx, Fy]
+		if not hasattr(self, 'externalField'):
+			self.externalField = numpy.zeros(self.UMap.shape)
+
+		for coord in self.materialCoordsDic[materialNum]:
+			self.externalField[coord[0],coord[1],:] = force
+
+
 	def defineU_BC(self,SuperGeometry,materialNum,u,BCmethod = 'ZH'):
 		self.vloc = 0
 
@@ -304,14 +312,10 @@ class SuperLattice2D(SuperGeometry):
 		SuperLattice2D.G_omega = G/SuperLattice2D.omega
 
 	def prepareCoupling(self):
-								# !!!!!!!!!!!!!!!!!!!!!!!!!!! the following codes goes wrong !!!!!!!!!!!!!!!!!!!!!!!!!!!
-								# need to check f and rho for the wall in order to provide constant SC force
+
 		#calculate moment
-		#self.rhoMap = self.f.sum(2)
-		self.rhoMap = self.rhoMap * self.filterWall[:,:,0] + self.f.sum(2) * self.filterBulk[:,:,0]
+		self.rhoMap = self.rhoMap * self.filterWall[:,:,0] + self.f.sum(2) * self.filterBulk[:,:,0] # bounceBack wall's rho doesn't change
 		
-
-
 		self.momentX = (self.cx * self.f).sum(2) # (x,y)
 		self.momentY = (self.cy * self.f).sum(2) # (x,y)
 
@@ -321,7 +325,6 @@ class SuperLattice2D(SuperGeometry):
 		self.rhoContribX =  numpy.zeros(self.rhoMap.shape)
 		self.rhoContribY =  numpy.zeros(self.rhoMap.shape)
 		for k in numpy.arange(1,9):  # SC force component excluding " -Psi*G "
-
 
 			self.rhoContribX = self.rhoContribX - numpy.roll(numpy.roll(self.tmp_rho[k,:,:],self.cx[k],0),self.cy[k],1) * self.cx[k] # (x,y)
 			self.rhoContribY = self.rhoContribY - numpy.roll(numpy.roll(self.tmp_rho[k,:,:],self.cx[k],0),self.cy[k],1) * self.cy[k]
@@ -334,18 +337,33 @@ class SuperLattice2D(SuperGeometry):
 
 		self.totalRho_omega = self.rhoMap*self.omega + SuperLattice2D.rhoMap*SuperLattice2D.omega
 
-		self.commonUx = (self.momentX*self.omega + SuperLattice2D.momentX*SuperLattice2D.omega)/ self.totalRho_omega
-		self.commonUy = (self.momentY*self.omega + SuperLattice2D.momentY*SuperLattice2D.omega)/ self.totalRho_omega
+		commonUx = (self.momentX*self.omega + SuperLattice2D.momentX*SuperLattice2D.omega)/ self.totalRho_omega
+		commonUy = (self.momentY*self.omega + SuperLattice2D.momentY*SuperLattice2D.omega)/ self.totalRho_omega
 
-		# self.UMap[:,:,0] = self.commonUx - self.G_omega*SuperLattice2D.rhoContribX 
-		# self.UMap[:,:,1] = self.commonUy - self.G_omega*SuperLattice2D.rhoContribY
-		# SuperLattice2D.UMap[:,:,0] = self.commonUx - SuperLattice2D.G_omega*self.rhoContribX
-		# SuperLattice2D.UMap[:,:,1] = self.commonUy - SuperLattice2D.G_omega*self.rhoContribY
-		
-		self.UMap[:,:,0] = (self.commonUx - self.G_omega*SuperLattice2D.rhoContribX )*self.filterBulk[:,:,0]
-		self.UMap[:,:,1] = (self.commonUy - self.G_omega*SuperLattice2D.rhoContribY)*self.filterBulk[:,:,0]
-		SuperLattice2D.UMap[:,:,0] = (self.commonUx - SuperLattice2D.G_omega*self.rhoContribX)*self.filterBulk[:,:,0]
-		SuperLattice2D.UMap[:,:,1] = (self.commonUy - SuperLattice2D.G_omega*self.rhoContribY)*self.filterBulk[:,:,0]
+		if hasattr(self,'externalField'):
+			sumRho = self.rhoMap + SuperLattice2D.rhoMap
+			self.UMap[:,:,0] = commonUx - self.G_omega*SuperLattice2D.rhoContribX + self.omega*self.externalField[:,:,0]*self.rhoMap/sumRho
+			self.UMap[:,:,1] = commonUy - self.G_omega*SuperLattice2D.rhoContribY + self.omega*self.externalField[:,:,1]*self.rhoMap/sumRho
+		else:
+			self.UMap[:,:,0] = commonUx - self.G_omega*SuperLattice2D.rhoContribX 
+			self.UMap[:,:,1] = commonUy - self.G_omega*SuperLattice2D.rhoContribY 
+
+		if hasattr(SuperLattice2D,'externalField'):
+			if not 'sumRho' in locals():
+				sumRho = self.rhoMap + SuperLattice2D.rhoMap
+			SuperLattice2D.UMap[:,:,0] = commonUx - SuperLattice2D.G_omega*self.rhoContribX + SuperLattice2D.omega*SuperLattice2D.externalField[:,:,0]*SuperLattice2D.rhoMap/sumRho
+			SuperLattice2D.UMap[:,:,1] = commonUy - SuperLattice2D.G_omega*self.rhoContribY + SuperLattice2D.omega*SuperLattice2D.externalField[:,:,1]*SuperLattice2D.rhoMap/sumRho
+		else:
+			SuperLattice2D.UMap[:,:,0] = commonUx - SuperLattice2D.G_omega*self.rhoContribX
+			SuperLattice2D.UMap[:,:,1] = commonUy - SuperLattice2D.G_omega*self.rhoContribY
+
+
+
+
+
+
+
+
 
 if __name__ == "__main__":
 	import matplotlib.pyplot as plt
@@ -371,20 +389,26 @@ if __name__ == "__main__":
 
 	print('================================================')
 	#lattice
-	rho = 1
-	rhoZero = 0
-	u = [0,0.]
 	sLattice1 = SuperLattice2D(superG)
 	sLattice2 = SuperLattice2D(superG)
 
+
+	rho = 1
+	rhoZero = 0
+	u = [0,0.]
+	f1 = [20/(nx*ny),0]
+	f2 = [10/(nx*ny),-20/(nx*ny)]
+
 	sLattice1.defineRhoU(superG,1,rho,u)
 	sLattice1.defineRhoU(superG,2,rhoZero,u)
-	#sLattice1.defineRhoU(superG,3,0.5,u)
+	# sLattice1.defineExternalField(superG,1,f1)
+	# sLattice1.defineExternalField(superG,2,f1)
 
 
 	sLattice2.defineRhoU(superG,1,rhoZero,u)
 	sLattice2.defineRhoU(superG,2,rho,u)
-	#sLattice2.defineRhoU(superG,3,0.5,u)
+	sLattice2.defineExternalField(superG,1,f2)
+	sLattice2.defineExternalField(superG,2,f2)	
 
 	bulk1 = ShanChenBGKdynamics(omega1)
 	bulk2 = ShanChenBGKdynamics(omega2)
@@ -421,8 +445,6 @@ if __name__ == "__main__":
 	print('initial average rho1: {0:.5f}'.format(sLattice1.getAverageRho())) #initialize
 	print('initial average rho2: {0:.5f}'.format(sLattice2.getAverageRho()))
 
-	#ok now
-
 	for iT in numpy.arange( 2000 ):
 
 		# sLattice.openBC(superG,3)
@@ -432,16 +454,20 @@ if __name__ == "__main__":
 		# sLattice.defineU_BC(superG,4,poV)
 		# sLattice.defineRho_BC(superG,3,1)
 
+		# if iT == 2:
+		# 	print(sLattice2.externalField[:,:,1])
+		# 	# print(sLattice1.materialCoordsDic)
+
 		if iT%50==0:
 			im = plt.imshow(sLattice1.rhoMap, animated=True)
 			plt.draw()
+
 			if iT == 0:
-				plt.pause(5)
+				plt.pause(1)
 			else:
 				plt.pause(0.00001)
 			# numpy.savetxt('{}/rho1_{}'.format(outputDirectory,iT),sLattice1.getRhoMap())
-			print('{}/1000'.format(iT))
-
+			print('{}/2000'.format(iT))
 
 
 		sLattice1.prepareCoupling()
@@ -459,14 +485,16 @@ if __name__ == "__main__":
 	print('final average rho1: {0:.5f}'.format(sLattice1.getAverageRho()))
 	print('final average rho2: {0:.5f}'.format(sLattice2.getAverageRho()))
 
-	# for i in numpy.arange(sLattice1.rhoMap.shape[0]):
-	# 	for j in numpy.arange(sLattice1.rhoMap.shape[1]):
-	# 		print('%10.4f' %sLattice1.rhoMap[i,j],end='')
-	# 	print('')
+	for i in numpy.arange(sLattice1.rhoMap.shape[0]):
+		for j in numpy.arange(sLattice1.rhoMap.shape[1]):
+			print('%10.4f' %sLattice1.rhoMap[i,j],end='')
+		print('')
+
+
 
 	print('=========================================================================================')
 	# for i in numpy.arange(sLattice1.rhoMap.shape[0]):
 	# 	for j in numpy.arange(sLattice1.rhoMap.shape[1]):
-	# 		print('%10.4f' %sLattice2.rhoMap[i,j],end='')
+	# 		print('%10.4f' %sLattice2.UMap[i,j,0],end='')
 	# 	print('')
 
