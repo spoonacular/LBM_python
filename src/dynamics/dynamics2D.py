@@ -19,8 +19,9 @@ class BGKdynamics():
 		self.omega = omega #counterclockwise
 
 class BBwall():
-	def __init__(self):
+	def __init__(self, bounceBackRho = 1):
 		self.index = 2
+		self.bounceBackRho = bounceBackRho;
 
 class BBvelocity():
 	def __init__(self,omega):
