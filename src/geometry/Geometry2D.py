@@ -52,11 +52,11 @@ class SuperGeometry(CuboidGeometry2D):
 		else:
 			print('rename: unidentified number of input')
 
-		self.materialCoordDic = {}
+		self.materialCoordsDic = {}
 		size_ = [1,self.materialMap.shape[0]*self.materialMap.shape[1]]
 
 		for material in set(numpy.reshape(self.materialMap,size_)[0]):
-			self.materialCoordDic[material] = self.getMaterialCoords(material)
+			self.materialCoordsDic[material] = self.getMaterialCoords(material)
 
 
 	def getMaterialCoords(self, materialNum):

@@ -19,8 +19,9 @@ class BGKdynamics():
 		self.omega = omega #counterclockwise
 
 class BBwall():
-	def __init__(self):
+	def __init__(self, bounceBackRho = 1):
 		self.index = 2
+		self.bounceBackRho = bounceBackRho;
 
 class BBvelocity():
 	def __init__(self,omega):
@@ -34,6 +35,32 @@ class BBpressure():
 class movingWall():
 	def __init__(self):
 		self.index = 5
+
+
+class ShanChenBGKdynamics():
+	def __init__(self,omega):
+		self.index = 1
+		self.omega = omega
+
+
+
+
+class ShanChenGenerator():
+	def __init__(self,G,interactionPotential):
+		self.G = G
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 	# def calEqulibriumFunction(self,df):
 
